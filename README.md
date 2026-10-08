@@ -41,9 +41,10 @@ S3 (objetos + metadata), IAM (policy `iam/s3-data-engineering.json`), CloudWatch
 para logs da pipeline. Local: MinIO S3-compatível (console em `http://127.0.0.1:9001`).
 
 ## 6. Fluxo de dados
-`seed_raw` (CSV determinístico por seed) → `raw_to_bronze` (schema/tipos/ranges,
-rejeita tudo de uma vez, inclusive duplicatas). Fim: a bronze é o contrato
-de saída para 03/04.
+`seed_raw` (CSV determinístico por seed, `ts` em UTC explícito) → `raw_to_bronze`
+(schema/tipos/ranges, normaliza antes de checar, rejeita tudo de uma vez —
+inclusive duplicatas e colunas inesperadas). Fim: a bronze é o contrato
+de saída para 03/04. Chamadas S3 com retry padrão do SDK (5 tentativas).
 
 ## 7. Estrutura
 ```
@@ -122,18 +123,21 @@ Local: zero. AWS: S3 barato (GB + requests); lifecycle para IA/Glacier no raw
 antigo (a codificar); `delete_prefix` manual antes de remover o bucket.
 
 ## 16. Limitações conhecidas
-Sem orquestrador (CLI + `--date`; Step Functions no projeto 11), sem retry nas
-chamadas S3, sem `_SUCCESS`/manifesto de frescor, sem quarentena (1 linha ruim
-derruba o dia), `ts` sem timezone. Silver/gold vivem nos projetos 03/04.
-Diagnóstico completo com severidade e esforço em `docs/revisao-engenharia-dados.md`.
+Sem orquestrador (CLI + `--date`; Step Functions no projeto 11), sem
+`_SUCCESS`/manifesto de frescor, sem quarentena (1 linha ruim derruba o dia).
+Silver/gold vivem nos projetos 03/04. Diagnóstico completo com severidade e
+esforço em `docs/revisao-engenharia-dados.md`.
 
 ## 17. Decisões
 - Landing zone, não lakehouse: este projeto para na bronze; silver/gold têm dono downstream (03/04). Um dono por camada.
 - Reescrita determinística em vez de checkpoint: rerun é sempre seguro.
 - Validação coleta TODOS os erros antes de falhar (debug em 1 ciclo); duplicata reprova o lote.
+- Normalizar antes de checar (`br` → `BR` em vez de rejeitar); coluna inesperada falha alto (SCHEMA-01).
+- Todo `ts` é UTC explícito (`+00:00`), parseado com `utc=True` (TIME-01).
+- Retry padrão do SDK em toda chamada S3 (5 tentativas + backoff); `is_retryable` segue como classificador para tratamento customizado (RETRY-01).
 - Metadata no objeto (`rows`, `sources`) = auditoria sem catálogo.
 - Teste e2e como trava de idempotência: rerun gera bytes idênticos.
 
 ## 18. Melhorias (próximas, por prioridade)
-Retry S3, `_SUCCESS` + manifesto por data, `ts` com timezone, quarentena de
-linhas inválidas, lifecycle como código. Depois: bronze por hora, S3 Inventory.
+`_SUCCESS` + manifesto por data, quarentena de linhas inválidas, lockfile de
+dependências, lifecycle como código. Depois: bronze por hora, S3 Inventory.

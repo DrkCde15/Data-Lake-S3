@@ -41,7 +41,9 @@ def generate(cfg: GenConfig) -> list[dict[str, str]]:
                 "currency": "BRL",
                 "merchant": rng.choice(_MERCHANTS),
                 "country": rng.choice(_COUNTRIES),
-                "ts": f"{cfg.date}T{rng.randint(0, 23):02d}:{rng.randint(0, 59):02d}:00",
+                # TIME-01: naive timestamps silently shift the daily grain on
+                # real sources, so every ts is explicit UTC (+00:00).
+                "ts": f"{cfg.date}T{rng.randint(0, 23):02d}:{rng.randint(0, 59):02d}:00+00:00",
                 "status": rng.choice(["approved", "approved", "approved", "refunded"]),
             }
         )

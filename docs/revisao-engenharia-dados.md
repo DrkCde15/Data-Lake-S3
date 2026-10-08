@@ -81,6 +81,7 @@
 - **Evidência:** helper de classificação de erro transitório implementado e testado por ninguém/chamado por ninguém; `put/get/list` vão crus. Um throttle ou timeout derruba o run sem retentativa.
 - **Por que importa:** ingestão sem retry nem alerta é o caso clássico de "fluxo sem resiliência" (Alta seria se alimentasse decisão em produção; aqui é lab → Média).
 - **Como corrigir:** `boto3 Config(retries={'max_attempts': 5})` no `client()` ou decorar com backoff usando o próprio `is_retryable`; logar tentativa.
+- **Correção aplicada (2026-10-08):** `Config(retries standard 5 tentativas, connect 5s, read 60s)` em todo `client()`; `is_retryable` mantido como classificador; trava em `tests/test_lake_moto.py::test_s3_client_has_retries_and_timeouts`.
 
 ### TIME-01 `ts` sem timezone; `day` derivado sem UTC — Média · Esforço P
 - **Local:** `src/lake/generator.py:44` (`f"{date}T{HH:MM}:00"`, naive) + `src/lake/pipeline.py:68` (`pd.to_datetime(df["ts"])`)
@@ -88,6 +89,7 @@
 - **Evidência:** logs usam `datetime.now(UTC)` (`pipeline.py:97`, `logging.py:15`), mas o dado usa timestamp naive. Com fonte real em outro fuso, a agregação por `day` desloca receita de dia silenciosamente. É o "fuso implícito" da lista de sinais de alerta.
 - **Por que importa:** quebra silenciosa de grão diário na primeira fonte real.
 - **Como corrigir:** gerar `ts` com offset (`+00:00` ou `America/Sao_Paulo` explícito) e `pd.to_datetime(..., utc=True)` no gold; documentar "todo ts é UTC".
+- **Correção aplicada (2026-10-08):** gerador emite `+00:00`, `validate` parseia com `utc=True`; trava em `tests/test_generator_validate.py::test_generator_ts_is_explicit_utc`.
 
 ### MONEY-01 Dinheiro somado em float — Média · Esforço P
 - **Local:** `src/lake/pipeline.py:70-72` (`.agg(revenue=("amount","sum")).round(2)`)
@@ -102,6 +104,7 @@
 - **Evidência:** (1) `country`/`currency` são comparados contra listas conhecidas *antes* do `.str.upper()` (`:56`) — um `"br"` legítimo seria rejeitado em vez de normalizado. (2) colunas extras além de `COLUMNS` passam silenciosamente (só `missing` é checado) — schema drift invisível.
 - **Por que importa:** rigidez onde deveria normalizar, permissividade onde deveria alertar.
 - **Como corrigir:** normalizar (strip/upper) antes de validar; rejeitar ou logar colunas inesperadas.
+- **Correção aplicada (2026-10-08):** upper antes dos checks, `unexpected columns` e formato de moeda (`[A-Z]{3}`) como issues; travas em `test_generator_validate.py` (normalize/unexpected/bad_currency).
 
 ### DEPS-01 Dependências sem pin/lockfile — Baixa · Esforço P
 - **Local:** `requirements.txt:1-7` (`boto3>=1.34`, `pandas>=2.0`, sem lock)

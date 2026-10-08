@@ -3,6 +3,7 @@
 import pytest
 from moto import mock_aws
 
+from de_common import aws as aws_client_module
 from de_common.config import Settings
 from lake.lake import LakeManager
 
@@ -34,3 +35,18 @@ def test_bucket_object_lifecycle(lake: LakeManager) -> None:
 def test_ensure_bucket_idempotent(lake: LakeManager) -> None:
     lake.ensure_bucket()
     lake.ensure_bucket()
+
+
+def test_s3_client_has_retries_and_timeouts() -> None:
+    settings = Settings(
+        aws_region="sa-east-1",
+        endpoint_url="http://127.0.0.1:9000",
+        lake_bucket="retry-test",
+    )
+    client = aws_client_module.client(settings, "s3")
+    # botocore resolves max_attempts=5 to total_max_attempts=6 (1 + 5 retries).
+    retries = client.meta.config.retries
+    assert retries["mode"] == "standard"
+    assert retries.get("total_max_attempts", 0) >= 5
+    assert client.meta.config.connect_timeout == 5
+    assert client.meta.config.read_timeout == 60

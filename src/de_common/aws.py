@@ -37,10 +37,18 @@ def new_session(settings: Settings) -> boto3.Session:
 
 
 def client(settings: Settings, service: str) -> Any:
+    # Standard SDK retries (throttling, timeouts, 5xx) with backoff in every
+    # mode: transient S3 failures retry instead of killing the run (RETRY-01).
+    # is_retryable() stays as the classifier for custom handling by callers.
+    base = botocore.config.Config(
+        retries={"max_attempts": 5, "mode": "standard"},
+        connect_timeout=5,
+        read_timeout=60,
+    )
     if settings.is_local:
-        cfg = botocore.config.Config(s3={"addressing_style": "path"})
+        cfg = base.merge(botocore.config.Config(s3={"addressing_style": "path"}))
         return new_session(settings).client(service, endpoint_url=settings.endpoint_url, config=cfg)
-    return new_session(settings).client(service, endpoint_url=settings.endpoint_url)
+    return new_session(settings).client(service, endpoint_url=settings.endpoint_url, config=base)
 
 
 def is_retryable(exc: Exception) -> bool:
