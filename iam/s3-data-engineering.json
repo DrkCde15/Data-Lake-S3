@@ -1,0 +1,27 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListOwnBuckets",
+      "Effect": "Allow",
+      "Action": "s3:ListAllMyBuckets",
+      "Resource": "*"
+    },
+    {
+      "Sid": "LabBucketAccess",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::data-engineer-lab-*",
+        "arn:aws:s3:::data-engineer-lab-*/*",
+        "arn:aws:s3:::data-engineer-athena-results-*",
+        "arn:aws:s3:::data-engineer-athena-results-*/*"
+      ]
+    }
+  ]
+}
