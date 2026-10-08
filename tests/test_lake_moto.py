@@ -1,4 +1,4 @@
-"""Unit tests with moto (no LocalStack needed)."""
+"""Unit tests with moto (no live S3 needed)."""
 
 import pytest
 from moto import mock_aws

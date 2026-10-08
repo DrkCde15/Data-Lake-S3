@@ -1,7 +1,7 @@
-# 01 - S3 Data Lake (medallion: raw → bronze → silver → gold)
+# Data-Lake-S3 (medallion: raw → bronze → silver → gold)
 
 Lake em S3 com 4 camadas que transforma arquivos crus de transações em uma
-tabela diária de receita por país, pronta para BI/ML. Local-first (LocalStack,
+tabela diária de receita por país, pronta para BI/ML. Local-first (MinIO,
 custo zero) e o mesmo código roda na AWS real.
 
 ## 1. Problema
@@ -49,7 +49,7 @@ flowchart LR
 
 ## 5. Serviços AWS
 S3 (objetos + metadata), IAM (policy `iam/s3-data-engineering.json`), CloudWatch Logs
-para logs da pipeline. Local: LocalStack S3.
+para logs da pipeline. Local: MinIO S3-compatível (console em `http://127.0.0.1:9001`).
 
 ## 6. Fluxo de dados
 `seed_raw` (CSV determinístico por seed) → `raw_to_bronze` (schema/tipos/ranges,
@@ -64,22 +64,23 @@ tests/          test_generator_validate.py  # determinismo + 4 classes de erro
                 test_gold_revenue.py        # regra de receita (literal) + e2e em moto
                 test_lake_moto.py           # ciclo de vida S3
                 test_de_common_*.py         # config, ids, logging
-                test_pipeline_e2e.py        # LocalStack: reconciliação + rerun idêntico
-scripts/run_local.sh   # demo end-to-end (sobe o LocalStack sozinho)
+                test_pipeline_e2e.py        # MinIO: reconciliação + rerun idêntico
+scripts/run_local.sh   # demo end-to-end (sobe o MinIO sozinho)
 iam/s3-data-engineering.json
 docs/revisao-engenharia-dados.md   # revisão técnica completa + roadmap
 ```
 
 ## 8. Pré-requisitos
-Python 3.12+, AWS CLI, podman (para o LocalStack via `run_local.sh`).
+Python 3.12+, AWS CLI, podman (para o MinIO via `run_local.sh`).
 
 ## 9. Configuração
 Copie `.env.example` para `.env` (nunca commite o `.env`; os defaults já
-apontam para o LocalStack). `Settings.from_env()` — sem credenciais no código.
+apontam para o MinIO local). `Settings.from_env()` — sem credenciais no código.
 
 | Variável | Local | AWS real |
 |---|---|---|
-| `AWS_ENDPOINT_URL` | `http://127.0.0.1:4566` | *(remover)* |
+| `AWS_ENDPOINT_URL` | `http://127.0.0.1:9000` | *(remover)* |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | `minioadmin` / `minioadmin` | *(remover; vale o profile SSO)* |
 | `AWS_PROFILE` | `local` | profile SSO |
 | `AWS_REGION` | `sa-east-1` | `sa-east-1` |
 | `LAKE_BUCKET` | `data-engineer-lab-local` | `data-engineer-lab-<account-id>` |
@@ -91,18 +92,20 @@ apontam para o LocalStack). `Settings.from_env()` — sem credenciais no código
 
 ## 11. Execução local
 ```bash
-cd 01-s3-data-lake
+cd Data-Lake-S3
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/run_local.sh [YYYY-MM-DD] [N]   # defaults: 2026-10-08, 2000 transações, seed 42
 .venv/bin/python -m pytest -v
 ```
-O script sobe o LocalStack via podman se preciso, faz seed + promoção
+O script sobe o MinIO via podman se preciso, faz seed + promoção
 raw→bronze→silver→gold e imprime os logs JSON de cada estágio. Rerun do mesmo
-dia gera objetos idênticos (idempotência verificada em teste).
+dia gera objetos idênticos (idempotência verificada em teste). Navegue nos
+arquivos pelo console em `http://127.0.0.1:9001` (`minioadmin`/`minioadmin`).
 
 Ou passo a passo:
 ```bash
-export AWS_ENDPOINT_URL=http://127.0.0.1:4566 AWS_PROFILE=local LAKE_BUCKET=data-engineer-lab-local
+export AWS_ENDPOINT_URL=http://127.0.0.1:9000 AWS_PROFILE=local LAKE_BUCKET=data-engineer-lab-local
+export AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin
 .venv/bin/python -m lake.run --date 2026-10-08 --transactions 2000 --seed 42
 ```
 
@@ -117,7 +120,7 @@ Remover `AWS_ENDPOINT_URL`, usar profile SSO; bucket real
 - `test_generator_validate.py` — determinismo do gerador, roundtrip CSV, 4 classes de erro rejeitadas.
 - `test_gold_revenue.py` — **especificação da receita** com valores fixos (2 approved + 1 refunded → `revenue=150.00`, `net=120.00`) + e2e completo em moto. **Roda no CI.**
 - `test_lake_moto.py` — ciclo de vida S3 (upload/exists/list/get/copy) e `ensure_bucket` idempotente.
-- `test_pipeline_e2e.py` — contra LocalStack: reconciliação do gold + rerun idêntico. **Pulado sem LocalStack** (inclusive no CI, que não o sobe).
+- `test_pipeline_e2e.py` — contra MinIO: reconciliação do gold + rerun idêntico. Roda no CI (MinIO como service) e localmente com a stack no ar; pulado só sem S3 compatível.
 - `ruff check .`, `ruff format --check .`, `mypy src` (strict) e scan gitleaks rodam no CI.
 
 ## 14. Observabilidade

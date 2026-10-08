@@ -18,7 +18,7 @@ def test_from_env_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_from_env_local(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("AWS_ENDPOINT_URL", "http://127.0.0.1:4566")
+    monkeypatch.setenv("AWS_ENDPOINT_URL", "http://127.0.0.1:9000")
     monkeypatch.setenv("LAKE_BUCKET", "my-bucket")
     s = Settings.from_env()
     assert s.is_local

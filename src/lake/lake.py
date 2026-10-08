@@ -39,7 +39,16 @@ class LakeManager:
                 kwargs["CreateBucketConfiguration"] = {
                     "LocationConstraint": self.settings.aws_region
                 }
-            self._s3.create_bucket(**kwargs)
+            try:
+                self._s3.create_bucket(**kwargs)
+            except botocore.exceptions.ClientError as create_exc:
+                # Some S3-compatible stores reject LocationConstraint:
+                # retry bare, which every implementation accepts.
+                create_code = create_exc.response.get("Error", {}).get("Code", "")
+                if create_code not in {"InvalidLocationConstraint", "InvalidArgument"}:
+                    raise
+                kwargs.pop("CreateBucketConfiguration", None)
+                self._s3.create_bucket(**kwargs)
             bind(log, logging.INFO, "bucket created", bucket=self.bucket)
 
     def upload_bytes(self, key: str, data: bytes, metadata: dict[str, str]) -> None:

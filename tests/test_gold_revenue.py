@@ -3,7 +3,7 @@
 Specification test with hand-crafted silver rows and a LITERAL expected
 frame — deliberately not recomputed with the implementation's groupby, so a
 regression in silver_to_gold fails here instead of mirroring the bug.
-Runs on moto, so it executes in CI without LocalStack (covers E2E-01).
+Runs on moto, so it executes in CI without a live S3 (covers E2E-01).
 """
 
 import io
@@ -72,7 +72,7 @@ def test_silver_to_gold_separates_refunds(lake: LakeManager) -> None:
 
 
 def test_full_run_gold_is_internally_consistent(lake: LakeManager) -> None:
-    """Moto-backed end-to-end: runs raw->gold without LocalStack (CI-safe)."""
+    """Moto-backed end-to-end: runs raw->gold without a live S3 (CI-safe)."""
     out = run(lake, DATE, 200, 42)
     gold = pd.read_csv(io.BytesIO(lake.get_bytes(out["gold"])))
     silver = pd.read_csv(io.BytesIO(lake.get_bytes(out["silver"])))
