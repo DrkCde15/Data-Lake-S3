@@ -20,10 +20,17 @@ from .config import Settings
 
 
 def new_session(settings: Settings) -> boto3.Session:
+    # Standard AWS precedence: static env creds beat profile. This also keeps
+    # moto-based tests independent of ~/.aws files (they set test/test creds).
+    access_key = os.environ.get("AWS_ACCESS_KEY_ID", "")
+    secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "")
     if settings.is_local:
+        access_key = access_key or "minioadmin"
+        secret_key = secret_key or "minioadmin"
+    if settings.is_local or (access_key and secret_key):
         return boto3.Session(
-            aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID", "minioadmin"),
-            aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY", "minioadmin"),
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
             region_name=settings.aws_region,
         )
     return boto3.Session(profile_name=settings.aws_profile, region_name=settings.aws_region)

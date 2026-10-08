@@ -12,6 +12,8 @@ def _lake(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test")
     monkeypatch.delenv("AWS_ENDPOINT_URL", raising=False)
+    # endpoint None + moto: requests never leave the mock, and the static
+    # creds above select the explicit-creds path (no ~/.aws profile lookup).
     settings = Settings(aws_region="us-east-1", endpoint_url=None, lake_bucket="test-bucket")
     with mock_aws():
         mgr = LakeManager(settings)
