@@ -67,6 +67,7 @@
 - **Evidência:** `validate_transactions` falha o lote inteiro se houver qualquer `transaction_id` duplicado — inclusive entre múltiplos arquivos raw concatenados (`pipeline.py:40-41`). Logo a bronze nunca contém dupes e o `drop_duplicates` da silver nunca remove nada. As duas etapas contradizem-se: ou duplicata é erro fatal (e o dedupe é código morto) ou é esperada (e a validação não deveria derrubar o lote).
 - **Por que importa:** rigidez + lógica morta que sugere uma garantia que não existe; com fonte real, 1 duplicata derruba o dia inteiro.
 - **Como corrigir:** decidir e documentar: (a) manter fail-fast e remover o dedupe, ou (b) mover dupes para quarentena (`bronze/quarantine/date=.../`) e deixar a silver dedupar. Para estágio 1, (a) + documentar é suficiente.
+- **Correção aplicada (2026-10-08):** opção (a) — `bronze_to_silver` virou pass-through determinístico (sem `drop_duplicates`), metadata `dedupe: enforced-in-bronze-validation`; contrato travado em `tests/test_silver_contract.py` (dupe entre 2 arquivos reprova o lote; silver byte-idêntica à bronze). Quarentena segue adiada para o estágio 2.
 
 ### RETRY-01 `is_retryable` existe mas nunca é usado; S3 sem retry/timeout — Média · Esforço P
 - **Local:** `src/de_common/aws.py:34-46` (definido, zero chamadas) + `src/lake/lake.py:45-48,66-69` (chamadas diretas)

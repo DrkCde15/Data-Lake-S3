@@ -28,7 +28,7 @@ flowchart LR
 |---|---|---|---|
 | `raw` | `transactions-seed{seed}.csv` | evento (`transaction_id`) | Bruto imutável e reproduzível (mesmo seed → mesmos bytes) |
 | `bronze` | `validated.csv` | evento | Schema, tipos, ranges e domínios válidos (falha o lote com todos os erros listados) |
-| `silver` | `deduped.csv` | `transaction_id` único | Sem duplicatas (`drop_duplicates`, keep last) |
+| `silver` | `deduped.csv` | `transaction_id` único | Espelho da bronze; duplicatas barradas na validação (ver §17) |
 | `gold` | `daily-revenue.csv` | `(day, country)` | Receita diária por país (semântica abaixo) |
 
 ## 4. Semântica do gold
@@ -53,7 +53,8 @@ para logs da pipeline. Local: MinIO S3-compatível (console em `http://127.0.0.1
 
 ## 6. Fluxo de dados
 `seed_raw` (CSV determinístico por seed) → `raw_to_bronze` (schema/tipos/ranges,
-rejeita tudo de uma vez) → `bronze_to_silver` (dedupe por `transaction_id`) →
+rejeita tudo de uma vez, inclusive duplicatas) → `bronze_to_silver`
+(pass-through determinístico; sem dedupe morto) →
 `silver_to_gold` (agregação da seção 4).
 
 ## 7. Estrutura
@@ -62,6 +63,7 @@ src/lake/       generator.py lake.py validate.py pipeline.py run.py
 src/de_common/  config.py aws.py errors.py ids.py logging.py   # compartilhada (vendored)
 tests/          test_generator_validate.py  # determinismo + 4 classes de erro
                 test_gold_revenue.py        # regra de receita (literal) + e2e em moto
+                test_silver_contract.py   # duplicata reprova o lote; silver = espelho da bronze
                 test_lake_moto.py           # ciclo de vida S3
                 test_de_common_*.py         # config, ids, logging
                 test_pipeline_e2e.py        # MinIO: reconciliação + rerun idêntico
@@ -119,6 +121,7 @@ Remover `AWS_ENDPOINT_URL`, usar profile SSO; bucket real
 ```
 - `test_generator_validate.py` — determinismo do gerador, roundtrip CSV, 4 classes de erro rejeitadas.
 - `test_gold_revenue.py` — **especificação da receita** com valores fixos (2 approved + 1 refunded → `revenue=150.00`, `net=120.00`) + e2e completo em moto. **Roda no CI.**
+- `test_silver_contract.py` — duplicata (mesmo entre 2 arquivos raw) reprova o lote; silver é byte-idêntica à bronze. **Roda no CI.**
 - `test_lake_moto.py` — ciclo de vida S3 (upload/exists/list/get/copy) e `ensure_bucket` idempotente.
 - `test_pipeline_e2e.py` — contra MinIO: reconciliação do gold + rerun idêntico. Roda no CI (MinIO como service) e localmente com a stack no ar; pulado só sem S3 compatível.
 - `ruff check .`, `ruff format --check .`, `mypy src` (strict) e scan gitleaks rodam no CI.
@@ -146,6 +149,7 @@ esforço em `docs/revisao-engenharia-dados.md`.
 - Validação coleta TODOS os erros antes de falhar (debug em 1 ciclo).
 - Metadata no objeto (`rows`, `sources`) = auditoria sem catálogo.
 - `revenue` soma só `approved`; reembolso vai para `refunded_amount` e abate em `net_revenue` (GOLD-01).
+- Duplicata reprova o lote na bronze; a silver é pass-through sem `drop_duplicates` morto (SILVER-01, opção fail-fast documentado).
 - Teste literal como especificação: o e2e que recomputa o esperado com a mesma lógica não prova a regra (E2E-01).
 
 ## 18. Melhorias (próximas, por prioridade)

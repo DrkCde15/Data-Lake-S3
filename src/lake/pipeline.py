@@ -53,16 +53,20 @@ def raw_to_bronze(lake: LakeManager, date: str) -> str:
 
 
 def bronze_to_silver(lake: LakeManager, date: str) -> str:
+    # Pass-through determinístico, sem drop_duplicates: duplicatas são
+    # barradas a montante (validate_transactions rejeita o lote inteiro),
+    # então a bronze nunca contém dupes e dedupar aqui seria código morto
+    # que sugere uma garantia que não existe. Contrato travado em
+    # tests/test_silver_contract.py. Ver SILVER-01 em
+    # docs/revisao-engenharia-dados.md.
     df = pd.read_csv(io.BytesIO(lake.get_bytes(layer_key("bronze", date, "validated.csv"))))
-    before = len(df)
-    silver = df.drop_duplicates(subset="transaction_id", keep="last").reset_index(drop=True)
     dest = layer_key("silver", date, "deduped.csv")
     lake.upload_bytes(
         dest,
-        silver.to_csv(index=False).encode(),
-        {"rows-in": str(before), "rows-out": str(len(silver))},
+        df.to_csv(index=False).encode(),
+        {"rows": str(len(df)), "dedupe": "enforced-in-bronze-validation"},
     )
-    bind(log, logging.INFO, "silver written", dest=dest, removed=before - len(silver))
+    bind(log, logging.INFO, "silver written", dest=dest, rows=len(df))
     return dest
 
 
