@@ -4,6 +4,12 @@
 **Escopo:** `01-s3-data-lake/` — `src/lake/` (generator, validate, lake, pipeline, run), `src/de_common/`, `tests/` (5 arquivos), `iam/s3-data-engineering.json`, `.github/workflows/ci.yml`, `scripts/run_local.sh`, README, `.env.example`. Análise estática; nada foi executado contra AWS ou LocalStack.
 **Maturidade assumida:** Estágio 1 — portfólio/estudo executável local ("primeiro valor com poucas peças"); o próprio README do portfólio marca este projeto como lab, não produção.
 
+> **Nota de escopo (2026-10-08, pós-revisão):** o projeto foi cortado para
+> **landing zone (raw→bronze)** — silver/gold e seus testes saíram daqui e
+> passam a morar nos projetos 03/04. As correções GOLD-01, E2E-01 e SILVER-01
+> continuam registradas abaixo como histórico, e a última regra de gold
+> conhecida está no README §4 para os projetos downstream partirem dela.
+
 ## Veredito
 
 É um lab de estágio 1 bem construído: medallion raw→bronze→silver→gold funcional, idempotente por construção, com validação fail-fast, CI com lint+format+mypy strict+gitleaks e zero over-engineering (pandas + S3, sem Spark/Kafka). Para o propósito declarado, está pronto. Mas há **um número potencialmente errado chegando ao consumidor** (o gold soma reembolsos como receita), o teste que deveria pegá-lo **espelha o bug e nem roda no CI**, e há uma **contradição de design** entre validar e dedupar. Esses três itens são o que mais importa agora.
